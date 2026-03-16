@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless URL Shortener
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 10
+    Environment:
+      Variables:
+        TABLE_NAME:
+          Ref: UrlTable
+Resources:
+  UrlTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: url-shortener
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: code
+        AttributeType: S
+      KeySchema:
+      - AttributeName: code
+        KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+  ShortenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ShortenFunction
+      Handler: index.handler
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UrlTable
+      Events:
+        ShortenApi:
+          Type: Api
+          Properties:
+            Path: /shorten
+            Method: post
+    Metadata:
+      SamResourceId: ShortenFunction
+  RedirectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: RedirectFunction
+      Handler: index.handler
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Ref: UrlTable
+      Events:
+        RedirectApi:
+          Type: Api
+          Properties:
+            Path: /{code}
+            Method: get
+    Metadata:
+      SamResourceId: RedirectFunction
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod
